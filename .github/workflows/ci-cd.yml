@@ -74,8 +74,8 @@ jobs:
             ${{ runner.os }}-pnpm-store-
       
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      
+        run: pnpm install
+
       - name: Generate Prisma Client
         run: pnpm run prisma:generate
       
