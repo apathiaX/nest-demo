@@ -1,0 +1,32 @@
+# ============================================
+# 开发环境 Dockerfile
+# ============================================
+
+FROM node:20-alpine AS development
+
+WORKDIR /app
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 复制依赖配置文件
+COPY package.json pnpm-lock.yaml ./
+
+# 复制 Prisma schema
+COPY prisma ./prisma/
+
+# 安装所有依赖（包括开发依赖）
+RUN pnpm install --frozen-lockfile
+
+# 生成 Prisma Client
+RUN pnpm run prisma:generate
+
+# 复制源代码
+COPY . .
+
+# 暴露端口
+EXPOSE 3000 9229
+
+# 启动开发服务器
+CMD ["pnpm", "run", "start:dev"]
+

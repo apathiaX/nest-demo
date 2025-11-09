@@ -1,0 +1,86 @@
+version: '3.9'
+
+# ============================================
+# 开发环境 Docker Compose 配置
+# ============================================
+
+services:
+  # ==================== MySQL 数据库 ====================
+  mysql:
+    image: mysql:8.0
+    container_name: nest-demo-mysql-dev
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: nest_demo_dev
+      MYSQL_USER: nest_user
+      MYSQL_PASSWORD: nest_pass_dev
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - nest-dev-network
+    command: 
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+
+  # ==================== Redis 缓存 ====================
+  redis:
+    image: redis:7-alpine
+    container_name: nest-demo-redis-dev
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - nest-dev-network
+    command: redis-server --appendonly yes
+
+  # ==================== NestJS 应用 (开发模式) ====================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: development
+    image: nest-demo:dev
+    container_name: nest-demo-app-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: mysql://nest_user:nest_pass_dev@mysql:3306/nest_demo_dev
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production
+      ENCRYPTION_KEY: dev-encryption-key-32-chars!!!
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      ENABLE_API_DOCS: "true"
+      TZ: Asia/Shanghai
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Debug port
+    networks:
+      - nest-dev-network
+    depends_on:
+      - mysql
+      - redis
+    command: pnpm run start:dev
+
+networks:
+  nest-dev-network:
+    driver: bridge
+
+volumes:
+  mysql_dev_data:
+  redis_dev_data:
+

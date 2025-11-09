@@ -1,0 +1,92 @@
+# Dependencies
+node_modules
+npm-debug.log
+pnpm-debug.log
+yarn-error.log
+.pnpm-store
+
+# Build outputs
+dist
+build
+.next
+out
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env*.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs
+CHANGELOG.md
+README.md
+LICENSE
+
+# Testing
+coverage
+.nyc_output
+test
+tests
+__tests__
+**/*.spec.ts
+**/*.test.ts
+jest.config.js
+
+# Logs
+logs
+*.log
+
+# Uploads
+uploads
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Deployment
+deploy
+
+# Backup
+backups
+*.backup
+
+# Temporary files
+tmp
+temp
+.tmp
+.temp
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Prisma
+prisma/migrations
+!prisma/schema.prisma
+
+# PM2
+ecosystem.config.js

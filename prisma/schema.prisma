@@ -1,0 +1,284 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 枚举类型定义
+enum UserStatus {
+  active
+  inactive
+  suspended
+  pending
+}
+
+enum AuthProvider {
+  local
+  phone
+  huawei
+  wechat
+  qq
+  alipay
+}
+
+enum PlanType {
+  habit
+  challenge
+}
+
+enum PlanSource {
+  custom
+  system
+}
+
+enum RepeatUnit {
+  hour
+  day
+  week
+  month
+  year
+}
+
+enum TaskMode {
+  completion
+  counting
+}
+
+enum CountingMethod {
+  sum
+  update
+}
+
+enum DataSource {
+  manual
+  wearable
+  sensor
+}
+
+enum CompletionStatus {
+  completed
+  not_completed
+}
+
+enum ParticipantRole {
+  owner       // 所有者（创建者）- 完全控制权
+  admin       // 管理员 - 可以管理任务和成员
+  member      // 成员 - 可以创建和修改任务
+  viewer      // 观察者 - 只读权限
+}
+
+
+// 模型定义
+model User {
+  id               Int               @id @default(autoincrement())
+  user_key         String            @unique @default(uuid()) @map("user_key")
+  phone            String?           @unique
+  password         String?           // 加密存储，仅用于本地认证
+  nick_name        String?           @map("nick_name")
+  avatar           String?
+  status           UserStatus        @default(active)
+  is_vip           Boolean           @default(false) @map("is_vip")
+  phone_verified   Boolean           @default(false) @map("phone_verified")
+  last_login_at    DateTime?         @map("last_login_at")
+  created_at       DateTime          @default(now()) @map("created_at")
+  updated_at       DateTime          @updatedAt @map("updated_at")
+  
+  // 关联关系
+  auth_providers   AuthRelation[]
+  plan_participants PlanParticipant[]
+  task_records     TaskRecord[]
+  user_roles       UserRole[]
+  
+  @@map("users")
+}
+
+// ==================== RBAC 权限管理系统 ====================
+
+// 角色表
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // 角色显示名称，如："管理员"、"普通用户"
+  code        String   @unique // 角色代码，如："admin"、"user"、"guest"
+  description String?  // 角色描述
+  is_system   Boolean  @default(false) @map("is_system") // 是否系统角色（系统角色不可删除）
+  created_at  DateTime @default(now()) @map("created_at")
+  updated_at  DateTime @updatedAt @map("updated_at")
+  
+  // 关联关系
+  user_roles       UserRole[]
+  role_permissions RolePermission[]
+  
+  @@map("roles")
+}
+
+// 权限表
+model Permission {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // 权限显示名称，如："查看用户"、"删除用户"
+  code        String   @unique // 权限代码，如："user:read"、"user:delete"
+  resource    String   // 资源类型，如："user"、"plan"、"task"
+  action      String   // 操作类型，如："read"、"write"、"delete"
+  description String?  // 权限描述
+  created_at  DateTime @default(now()) @map("created_at")
+  updated_at  DateTime @updatedAt @map("updated_at")
+  
+  // 关联关系
+  role_permissions RolePermission[]
+  
+  @@unique([resource, action], name: "unique_resource_action")
+  @@map("permissions")
+}
+
+// 角色权限关联表（多对多）
+model RolePermission {
+  id            Int        @id @default(autoincrement())
+  role_id       Int        @map("role_id")
+  permission_id Int        @map("permission_id")
+  created_at    DateTime   @default(now()) @map("created_at")
+  
+  // 关联关系
+  role       Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  
+  @@unique([role_id, permission_id], name: "unique_role_permission")
+  @@map("role_permissions")
+}
+
+// 用户角色关联表（多对多）
+model UserRole {
+  id         Int      @id @default(autoincrement())
+  user_id    Int      @map("user_id")
+  role_id    Int      @map("role_id")
+  created_at DateTime @default(now()) @map("created_at")
+  
+  // 关联关系
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  
+  @@unique([user_id, role_id], name: "unique_user_role")
+  @@map("user_roles")
+}
+
+model AuthRelation {
+  id               Int             @id @default(autoincrement())
+  user_id          Int             @map("user_id")
+  provider         AuthProvider    @default(local)
+  provider_user_id String          @map("provider_user_id") // 第三方平台的用户ID：华为的用 UnionID
+  access_token     String?         @db.Text @map("access_token") // 加密存储
+  refresh_token    String?         @db.Text @map("refresh_token") // 加密存储
+  expires_at       DateTime?       @map("expires_at")
+  provider_data    Json?           @map("provider_data") // 存储第三方返回的原始数据
+  last_synced_at   DateTime?       @map("last_synced_at") // 最后同步时间
+  created_at       DateTime        @default(now()) @map("created_at")
+  updated_at       DateTime        @updatedAt @map("updated_at")
+  
+  // 关联关系
+  user             User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, provider_user_id], name: "unique_provider_user")
+  @@unique([user_id, provider], name: "unique_user_provider")
+  @@map("auth_providers")
+}
+
+model Plan {
+  id               Int               @id @default(autoincrement())
+  name             String
+  icon             String?
+  background_image String?           @map("background_image")
+  description      String?           @db.Text
+  bonus            String?           @db.Text
+  medals           String?           @db.Text
+  type             PlanType          @default(habit)
+  create_source    PlanSource        @default(custom) @map("create_source")
+  is_public        Boolean           @default(false) @map("is_public")
+  creator          Int
+  created_at       DateTime          @default(now()) @map("created_at")
+  updated_at       DateTime          @updatedAt @map("updated_at")
+  
+  // 关联关系
+  participants     PlanParticipant[]
+  tasks            Task[]
+  
+  @@map("plans")
+}
+
+model PlanParticipant {
+  id               Int              @id @default(autoincrement())
+  plan_id          Int              @map("plan_id")
+  user_id          Int              @map("user_id")
+  role             ParticipantRole  @default(member)
+  joined_at        DateTime         @default(now()) @map("joined_at")
+  updated_at       DateTime         @updatedAt @map("updated_at")
+  
+  // 关联关系
+  plan             Plan             @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  user             User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([plan_id, user_id], name: "unique_plan_user")
+  @@map("plan_participants")
+}
+
+model Task {
+  id               Int             @id @default(autoincrement())
+  plan_id          Int             @map("plan_id")
+  parent_task_id   Int?            @map("parent_task_id")
+  name             String
+  description      String?         @db.Text
+  repeat_interval  Int?
+  repeat_unit      RepeatUnit?     @default(day) @map("repeat_unit")
+  is_repeating     Boolean         @default(false) @map("is_repeating")
+  needs_reminder   Boolean         @default(false) @map("needs_reminder")
+  mode             TaskMode        @default(completion)
+  counting_start   Int             @default(0) @map("counting_start")
+  counting_target  Int             @default(1) @map("counting_target")
+  counting_method  CountingMethod? @default(sum) @map("counting_method")
+  data_source      DataSource      @default(manual) @map("data_source")
+  created_at       DateTime        @default(now()) @map("created_at")
+  updated_at       DateTime        @updatedAt @map("updated_at")
+  
+  // 关联关系
+  plan             Plan            @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  parent_task      Task?           @relation("TaskToTask", fields: [parent_task_id], references: [id], onDelete: Cascade)
+  subtasks         Task[]          @relation("TaskToTask")
+  reminders        TaskReminder[]
+  records          TaskRecord[]
+  
+  @@map("tasks")
+}
+
+model TaskReminder {
+  id              Int      @id @default(autoincrement())
+  task_id         Int      @map("task_id")
+  reminder_time   String   @map("reminder_time") // 存储为HH:MM:SS格式
+  days_of_week    String?  @map("days_of_week")  // 存储为逗号分隔的字符串，如"1,2,3,4,5,6,7"
+  is_active       Boolean  @default(true) @map("is_active")
+  created_at      DateTime @default(now()) @map("created_at")
+  
+  // 关联关系
+  task            Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  
+  @@map("task_reminders")
+}
+
+model TaskRecord {
+  id                 Int               @id @default(autoincrement())
+  task_id            Int               @map("task_id")
+  user_id            Int               @map("user_id")
+  completion_date    DateTime          @map("completion_date")
+  completion_status  CompletionStatus? @default(not_completed) @map("completion_status")
+  count_value        Int?              @map("count_value")
+  notes              String?           @db.Text
+  recorded_at        DateTime          @default(now()) @map("recorded_at")
+  
+  // 关联关系
+  task               Task              @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user               User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([task_id, user_id, completion_date], name: "unique_task_user_date")
+  @@map("task_records")
+}
+
