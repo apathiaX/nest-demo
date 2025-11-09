@@ -75,6 +75,10 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/package.json ./
 
+# 复制启动脚本
+COPY --chown=nestjs:nodejs docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # 创建日志和上传目录
 RUN mkdir -p logs uploads && \
     chown -R nestjs:nodejs logs uploads
@@ -89,8 +93,8 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# 使用 dumb-init 作为入口点
-ENTRYPOINT ["dumb-init", "--"]
+# 使用启动脚本作为入口点（自动执行迁移和 seed）
+ENTRYPOINT ["dumb-init", "--", "docker-entrypoint.sh"]
 
 # 启动命令
 CMD ["node", "dist/main.js"]
